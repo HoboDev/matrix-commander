@@ -1906,6 +1906,10 @@ class Callbacks(object):
                             ns=((event.server_timestamp * 1000000,) * 2),
                         )
                     msg_url += f" [Downloaded media file to {filename}]"
+                    file_downloaded = True
+                else:
+                    file_downloaded = False
+                    filename = None 
 
             if isinstance(event, RoomEncryptedMedia):  # for all e2e media
                 media_mxc = event.url
@@ -1937,45 +1941,147 @@ class Callbacks(object):
                     msg_url += (
                         f" [Downloaded and decrypted media file to {filename}]"
                     )
+                    file_downloaded = True
+                else:
+                    file_downloaded = False
+                    filename = None
 
             if isinstance(event, RoomMessageAudio):
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "audio",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received audio: " + event.body + msg_url
             elif isinstance(event, RoomMessageEmote):
-                msg = "Received emote: " + event.body
+                if gs.pa.output_json:
+                    msg_body = event.body
+                    msg_type = "emote"
+                else:
+                    msg = "Received emote: " + event.body
             elif isinstance(event, RoomMessageFile):
-                msg = "Received file: " + event.body + msg_url
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "file",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
+                msg = "Received file: " + event.body + msg_url   
             elif isinstance(event, RoomMessageFormatted):
                 msg = event.body
+                msg_type = "text"
             elif isinstance(event, RoomMessageImage):
                 # Usually body is something like "image.svg"
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "image",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received image: " + event.body + msg_url
             elif isinstance(event, RoomMessageNotice):
                 msg = event.body  # Extract the message text
+                msg_type = "notice"
             elif isinstance(event, RoomMessageText):
                 msg = event.body  # Extract the message text
+                msg_type = "text"
             elif isinstance(event, RoomMessageUnknown):
                 msg = "Received room message of unknown type: " + event.msgtype
+                msg_type = event.msgtype
             elif isinstance(event, RoomMessageVideo):
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "video",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received video: " + event.body + msg_url
             elif isinstance(event, RoomEncryptedAudio):
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "audio",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received encrypted audio: " + event.body + msg_url
             elif isinstance(event, RoomEncryptedFile):
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "file",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received encrypted file: " + event.body + msg_url
             elif isinstance(event, RoomEncryptedImage):
                 # Usually body is something like "image.svg"
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "image",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received encrypted image: " + event.body + msg_url
             elif isinstance(event, RoomEncryptedVideo):
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "video",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received encrypted video: " + event.body + msg_url
             elif isinstance(event, RoomMessageMedia):
                 # this should never be reached, this is a base class
                 # it should be a audio, image, video, etc.
                 # Put here at the end as defensive programming
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "media",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
                 msg = "Received media: " + event.body + msg_url
             elif isinstance(event, RoomEncryptedMedia):
                 # this should never be reached, this is a base class
                 # it should be a audio, image, video, etc.
                 # Put here at the end as defensive programming
-                msg = "Received encrypted media: " + event.body + msg_url
+                if gs.pa.output_json:
+                    msg_type = "file"
+                    file = {
+                        "type": "media",
+                        "name": event.body,
+                        "url": media_url,
+                        "downloaded": file_downloaded,
+                        "local_path": filename
+                    }
+                    msg = "Received encrypted media: " + event.body + msg_url
             elif isinstance(event, RoomMemberEvent):
                 msg = (
                     "Received room-member event: "
@@ -2039,6 +2145,24 @@ class Callbacks(object):
                 event_id_detail = f" | {event.event_id}"
             else:
                 event_id_detail = ""
+            
+            if msg_type is None:
+                msg_type = 'unknown'
+
+            response = {
+                "info": "Message received",
+                "room_nick": room_nick,
+                "room_id": room.room_id,
+                "sender_nick": sender_nick,
+                "sender_id": event.sender,
+                "datetime": event_datetime,
+                "event_id_detail": event_id_detail,
+                "message": msg,
+                "message_type": msg_type,
+                "file": file
+            }
+            
+            json_response = json.dumps(response);
             # Prevent faking messages by prefixing each line of a multiline
             # message with space.
             fixed_msg = re.sub("\n", "\n    ", msg)
@@ -2050,7 +2174,10 @@ class Callbacks(object):
                 f"{event_id_detail} | {fixed_msg}"
             )
             gs.log.debug(complete_msg)
-            print(complete_msg, flush=True)
+            if gs.pa.output_json:
+                print(json_response, flush=True)
+            else:
+                print(complete_msg, flush=True)
             if gs.pa.os_notify:
                 avatar_url = await get_avatar_url(self.client, event.sender)
                 notify(
@@ -4123,7 +4250,8 @@ async def listen_forever(client: AsyncClient) -> None:
         "This program is ready and listening for its Matrix messages."
         " To stop program type Control-C on keyboard or send signal"
         f" to process {os.getpid()}. PID can also be found in "
-        f'file "{PID_FILE_DEFAULT}".',
+        f'file "{PID_FILE_DEFAULT}".', 
+        file=sys.stderr,
         flush=True,
     )
     # the sync_loop will be terminated by user hitting Control-C to stop
@@ -8002,6 +8130,13 @@ def main_inner(
         "Multiple devices (with different device id) may have the same device "
         "name. In short, the same device name can be assigned to multiple "
         "different devices if desired.",
+    )
+    ap.add_argument(
+        # no single char flag
+        "--output-json",
+        required=False,
+        action="store_true",  # when option isn't used
+        help="Print message to stdout as JSON ",
     )
     ap.add_argument(
         # no single char flag
